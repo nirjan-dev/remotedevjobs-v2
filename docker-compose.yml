@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: remotedevjobs
+    volumes:
+      - pg_data:/./.data/postgres
+
+volumes:
+  pg_data:

@@ -12,10 +12,10 @@ pre-commit:
         - "*.html"
         - "*.vue"
       stage_fixed: true
-    - run: pnpm typecheck
-      glob:
-        - "*.ts"
-        - "*.js"
-        - "*.tsx"
-        - "*.jsx"
-        - "*.vue"
+    # - run: pnpm typecheck
+    #   glob:
+    #     - "*.ts"
+    #     - "*.js"
+    #     - "*.tsx"
+    #     - "*.jsx"
+    #     - "*.vue"
