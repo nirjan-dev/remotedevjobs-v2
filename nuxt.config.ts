@@ -1,8 +1,13 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  modules: ['@nuxt/eslint', '@nuxt/ui', '@nuxt/image', // '@nuxtjs/seo',
-    // '@nuxt/scripts',
-    '@nuxt/content', '@nuxtjs/seo'],
+  modules: [
+    '@nuxt/eslint',
+    '@nuxt/ui',
+    '@nuxt/image',
+    '@nuxt/content',
+    '@nuxtjs/seo',
+    '@nuxt/scripts',
+  ],
   devtools: { enabled: true },
   css: ['~/assets/css/main.css'],
 
@@ -20,18 +25,21 @@ export default defineNuxtConfig({
       stylistic: true,
     },
   },
+
+  scripts: {
+    registry: {
+      clarity: {
+        id: 'gezr3qvknq',
+      },
+      googleAnalytics: {
+        id: 'G-QY0M8DZKCN',
+      },
+    },
+  },
   sitemap: {
     sources: [
       '/api/_sitemap-urls',
     ],
   },
-
-  // scripts: {
-  //   registry: {
-  //     googleAnalytics: {
-  //       id: process.env.NUXT_PUBLIC_GA_ID,
-  //     },
-  //   },
-  // },
 
 })
