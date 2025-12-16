@@ -1,75 +1,116 @@
-# Nuxt Minimal Starter
+# RemoteDevJobs
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+**RemoteDevJobs** is a modern job board platform built to connect developers with remote opportunities. It leverages the power of Nuxt 4 for a performant frontend and a robust backend infrastructure using PostgreSQL and Drizzle ORM.
 
-## Setup
+## Key Features
 
-Make sure to install dependencies:
+- **Full-Stack Nuxt 4 Application**: Server-side rendering and static site generation capabilities.
+- **Type-Safe Database**: Integrated with **Drizzle ORM** and **PostgreSQL** for reliable data management.
+- **Modern UI**: Built with **Tailwind CSS** and **Nuxt UI** for a clean, responsive interface.
+- **Content Management**: Includes a blog and content system powered by **Nuxt Content**.
+- **Developer Experience**: Dockerized database setup and strict TypeScript configuration.
 
-```bash
-# npm
-npm install
+## Getting Started
 
-# pnpm
-pnpm install
+Follow these instructions to set up the project on your local machine.
 
-# yarn
-yarn install
+### Prerequisites
 
-# bun
-bun install
-```
+- **Node.js**: Version 24 or later (check `.nvmrc`).
+- **pnpm**: The preferred package manager.
+- **Docker**: Required for running the local PostgreSQL database.
 
-## Development Server
+### Installation
 
-Start the development server on `http://localhost:3000`:
+1. **Clone the repository:**
 
-```bash
-# npm
-npm run dev
+   ```bash
+   git clone <repository-url>
+   cd remotedevjobs-v2
+   ```
 
-# pnpm
-pnpm dev
+2. **Install dependencies:**
 
-# yarn
-yarn dev
+   ```bash
+   pnpm install
+   ```
 
-# bun
-bun run dev
-```
+3. **Set up environment variables:**
 
-## Production
+   Copy the example environment file and configure it:
 
-Build the application for production:
+   ```bash
+   cp .env.example .env
+   ```
 
-```bash
-# npm
-npm run build
+   Ensure `DATABASE_URL` is set in your `.env` file (default for local Docker setup):
+   ```env
+   DATABASE_URL=postgresql://user:password@localhost:5432/remotedevjobs
+   ```
 
-# pnpm
-pnpm build
+### Local Development
 
-# yarn
-yarn build
+1. **Start the database:**
 
-# bun
-bun run build
-```
+   Use Docker Compose to spin up the PostgreSQL container:
 
-Locally preview production build:
+   ```bash
+   pnpm docker:up
+   ```
 
-```bash
-# npm
-npm run preview
+2. **Initialize the database:**
 
-# pnpm
-pnpm preview
+   Push the schema and seed initial data:
 
-# yarn
-yarn preview
+   ```bash
+   pnpm db:push
+   pnpm db:seed
+   ```
 
-# bun
-bun run preview
-```
+3. **Start the development server:**
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+   ```bash
+   pnpm dev
+   ```
+
+   Visit `http://localhost:3000` to view the application.
+
+## Usage & Commands
+
+This project uses `pnpm` for script management.
+
+| Category | Command | Description |
+|----------|---------|-------------|
+| **Dev** | `pnpm dev` | Start the development server with hot-reload. |
+| | `pnpm build` | Build the application for production. |
+| | `pnpm preview` | Preview the production build locally. |
+| **Database** | `pnpm db:push` | Push schema changes to the database (prototyping). |
+| | `pnpm db:migrate` | Apply migrations to the database. |
+| | `pnpm db:studio` | Open Drizzle Studio to inspect the database. |
+| | `pnpm db:seed` | Populate the database with seed data. |
+| **Docker** | `pnpm docker:up` | Start the database container in detached mode. |
+| | `pnpm docker:down` | Stop and remove the database container. |
+| **Quality** | `pnpm lint` | Run ESLint to catch errors. |
+| | `pnpm typecheck` | Run TypeScript compiler check. |
+
+## Project Structure
+
+- **`app/`**: Main Nuxt application (pages, components, layouts).
+- **`server/`**: Server-side logic, API routes, and database schema.
+- **`content/`**: Markdown files for the blog and static pages.
+- **`public/`**: Static assets like images and fonts.
+- **`drizzle.config.ts`**: Configuration for Drizzle ORM.
+
+## Support & Contributing
+
+If you encounter issues or have questions, please file an issue in the repository issue tracker.
+
+### Contributing
+
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/name`).
+3. Commit your changes.
+4. Push to the branch.
+5. Open a Pull Request.
+
+Please ensure your code passes linting (`pnpm lint`) and type checks (`pnpm typecheck`) before submitting.
