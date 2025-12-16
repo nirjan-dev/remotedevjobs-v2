@@ -8,7 +8,4 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: remotedevjobs
     volumes:
-      - pg_data:/./.data/postgres
-
-volumes:
-  pg_data:
+      - ./.data/postgres:/var/lib/postgresql/data

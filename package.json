@@ -13,7 +13,11 @@
     "lint:fix": "eslint --fix",
     "db:studio": "drizzle-kit studio",
     "db:push": "drizzle-kit push",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
     "db:seed": "tsx server/database/seed.ts",
+    "db:introspect": "drizzle-kit introspect",
+    "docker:down": "docker compose down",
     "docker:up": "docker compose up -d"
   },
   "dependencies": {
