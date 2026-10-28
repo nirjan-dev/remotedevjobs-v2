@@ -2,9 +2,12 @@ import { db } from '~~/server/database/db'
 import { jobQueues } from '~~/server/database/schema'
 import { createJobFromAPIJob } from '~~/server/utils/ingestion'
 import type { JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import { requireWorkerAuthorization } from '~~/server/utils/workerAuth'
 import { asc, eq } from 'drizzle-orm'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireWorkerAuthorization(event)
+
   // 1. Fetch oldest item from queue
   const queueItem = await db.query.jobQueues.findFirst({
     orderBy: [asc(jobQueues.createdAt)],

@@ -21,6 +21,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    workerToken: '',
     public: {
       siteUrl: '',
     },

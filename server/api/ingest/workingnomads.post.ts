@@ -1,31 +1,18 @@
 import { db } from '~~/server/database/db'
 import { jobQueues } from '~~/server/database/schema'
 import { slugify, benefitsParser } from '~~/server/utils/parsers'
-import type { DevRemoteJob, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import type { WorkingNomadsJob, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import { requireWorkerAuthorization } from '~~/server/utils/workerAuth'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireWorkerAuthorization(event)
+
   try {
-    const data = await $fetch<{ jobs: DevRemoteJob[] }>('https://devremote.io/api/jobs/filter', {
-      method: 'POST',
-      body: {
-        query: {
-          search: '',
-          techStack: [],
-          date: 'ALL',
-          employmentType: 'FULL_TIME',
-          removeCompetitiveSalary: false,
-          salaryRange: {
-            min: 0,
-            max: 10000000,
-          },
-          tags: [],
-        },
-        pageSize: 30,
-        skip: 0,
-      },
-    })
+    const data = await $fetch<WorkingNomadsJob[]>('https://www.workingnomads.com/api/exposed_jobs/')
 
-    const jobsFromAPI = data.jobs.map(job => getAPIJobFromDevRemoteJob(job))
+    const devJobs = data.filter(job => job.category_name.toLowerCase() === 'development')
+
+    const jobsFromAPI = devJobs.map(job => getApiJobFromWorkingNomadsJob(job))
     const queuedLinks: string[] = []
 
     for (const job of jobsFromAPI) {
@@ -45,50 +32,47 @@ export default defineEventHandler(async () => {
     }
 
     return {
-      message: `Processed ${jobsFromAPI.length} jobs from DevRemote`,
+      message: `Processed ${jobsFromAPI.length} jobs from WorkingNomads`,
       queuedCount: queuedLinks.length,
       queuedJobs: queuedLinks,
     }
   }
   catch (e) {
-    console.error('Failed to fetch jobs from DevRemote', e)
+    console.error('Failed to fetch jobs from WorkingNomads', e)
     return {
-      message: 'Failed to fetch jobs from DevRemote',
+      message: 'Failed to fetch jobs from WorkingNomads',
       error: e,
     }
   }
 })
 
-const getAPIJobFromDevRemoteJob = (job: DevRemoteJob): JobFromAPIs => {
-  const experienceLevel = getExperienceLevelFromJob(job)
+const getApiJobFromWorkingNomadsJob = (job: WorkingNomadsJob): JobFromAPIs => {
+  const experienceLevel = getExperienceLevelFromTitle(job.title)
   const role = getRoleFromTitle(job.title)
   const tags = getTagsFromJobTags(job.tags)
   const benefits = benefitsParser(job.description)
-  // Note: 'postitionType' typo comes from the API response/Type definition
-  const duration = job.postitionType?.toLowerCase() ?? 'Full Time'
-  // Logic from v1: if noSalary is true, it constructs the range string (?)
-  const salary = job.noSalary ? `${job.salaryLower} - ${job.salaryUpper}` : 'unknown salary'
+  const locations = job.location.split(',').map(location => ({
+    name: location.trim(),
+    slug: slugify(location.trim()),
+  }))
 
   return {
     title: job.title,
     description: job.description,
-    link: job.applicationLink,
-    salary,
-    postedAt: new Date(job.createdAt),
-    slug: slugify(job.slug),
+    link: job.url,
+    salary: 'unknown salary',
+    postedAt: new Date(job.pub_date),
+    slug: slugify(`${job.title}-${job.company_name}-${new Date(job.pub_date).getTime()}`),
     company: {
-      name: job.company,
+      name: job.company_name,
       description: '',
-      logo: job.companyLogo,
-      slug: slugify(job.company),
+      logo: '',
+      slug: slugify(job.company_name),
     },
-    locations: [{
-      name: 'Worldwide',
-      slug: slugify('Worldwide'),
-    }],
+    locations,
     duration: {
-      name: duration,
-      slug: slugify(duration),
+      name: 'Full Time',
+      slug: slugify('Full Time'),
     },
     experienceLevel: {
       name: experienceLevel,
@@ -103,18 +87,13 @@ const getAPIJobFromDevRemoteJob = (job: DevRemoteJob): JobFromAPIs => {
   }
 }
 
-const getExperienceLevelFromJob = (job: DevRemoteJob) => {
-  if (job.seniority && job.seniority !== 'NOT_STATED') {
-    return job.seniority
-  }
-
-  const title = job.title.toLowerCase()
-  if (title.includes('senior')) return 'Senior'
-  if (title.includes('mid')) return 'Mid'
-  if (title.includes('junior')) return 'Junior'
-  if (title.includes('entry')) return 'Entry'
-  if (title.includes('intern')) return 'Intern'
-
+const getExperienceLevelFromTitle = (title: string) => {
+  const t = title.toLowerCase()
+  if (t.includes('senior')) return 'Senior'
+  if (t.includes('mid')) return 'Mid'
+  if (t.includes('junior')) return 'Junior'
+  if (t.includes('entry')) return 'Entry'
+  if (t.includes('intern')) return 'Intern'
   return 'Mid'
 }
 
@@ -135,9 +114,9 @@ const getRoleFromTitle = (title: string) => {
   return 'Developer'
 }
 
-const getTagsFromJobTags = (tags: string[]) => {
+const getTagsFromJobTags = (tags: string) => {
   if (!tags) return []
-  return tags.map(tag => ({
+  return tags.split(',').map(tag => ({
     name: tag,
     slug: slugify(tag.replace(/#/g, 'sharp ')),
   }))

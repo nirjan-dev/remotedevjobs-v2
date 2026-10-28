@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck",
+    "test": "pnpm build && node --test test/internal-work.test.mjs",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "db:studio": "drizzle-kit studio",

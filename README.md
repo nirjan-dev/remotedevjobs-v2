@@ -92,6 +92,102 @@ This project uses `pnpm` for script management.
 | | `pnpm docker:down` | Stop and remove the database container. |
 | **Quality** | `pnpm lint` | Run ESLint to catch errors. |
 | | `pnpm typecheck` | Run TypeScript compiler check. |
+| | `pnpm test` | Build and run isolated ingestion/worker HTTP regression checks (requires Docker). |
+
+## Internal ingestion and scheduling
+
+The job listings, filters and metadata remain public read-only APIs. Ingestion and
+queue execution are privileged operations, not browser links:
+
+| Method | Path | Effect |
+|--------|------|--------|
+| POST | `/api/ingest/{provider}` | Fetch the provider's jobs and enqueue new links. |
+| POST | `/api/queue/process` | Process at most one queued item; an empty queue returns `No jobs in queue`. |
+
+Supported provider names: `devremote`, `fourdayweek`, `himalayas`, `remoteok`,
+`remotive`, `trulyremote`, `workingnomads`. These endpoints accept no request body.
+GET and HEAD do not run ingestion or the queue worker; the old GET interface is removed.
+
+### Authentication
+
+Set **`NUXT_WORKER_TOKEN`** in the server environment and in the scheduler's secret
+store. Generate a random value with `openssl rand -hex 32`. This is private Nuxt
+runtime configuration: never put it under `runtimeConfig.public`, use a
+`NUXT_PUBLIC_` variable, commit it, or include it in a URL.
+
+Every operational POST requires `Authorization: Bearer <token>`. Missing or
+incorrect credentials return **401** with `WWW-Authenticate: Bearer`; a server
+without a configured token returns **503**, with no provider fetch or database
+work. Query parameters and cookies do not authenticate these calls. The token
+grants both ingestion and processing access; keep it only in trusted server-side
+schedulers, use HTTPS outside localhost, and rotate it if exposed.
+
+### Scheduler calls and rollout
+
+Production scheduling is **cron-job.org**, folder `remotedevjobs` (id `52231`),
+calling the production origin `https://remotedevjobs.net`. Eight jobs map to the
+endpoints above: one per provider plus a queue drain. Observed 2026-10-28:
+Devremote daily 04:00, Himalayas daily 04:05, RemoteOK daily 05:00, 4DayWeek
+daily 06:00, Remotive daily 03:00, TrulyRemote daily 03:00, WorkingNomads weekly
+Monday 01:01, queue drain every 30 minutes (per-job timezones observed as
+`Asia/Kathmandu`). Preserve each job's schedule, timezone and notifications;
+only the request changes. A separate `vercel deployment` job in the same folder
+triggers redeploys via a Vercel deploy hook and must not be modified.
+
+Per-job target settings (Advanced tab): **request method POST**, URL unchanged,
+**request body empty**, custom header `Authorization: Bearer <token>` holding the
+same `NUXT_WORKER_TOKEN` value as the server. cron-job.org supports POST and
+arbitrary custom headers, with a 30 s execution timeout and 64 KB output cap
+([FAQ](https://cron-job.org/en/faq/)). A GET-only cron service cannot call this
+interface directly.
+
+For a local smoke run (the variables must be exported in this shell):
+
+```bash
+export BASE_URL=http://localhost:3000
+# Set NUXT_WORKER_TOKEN securely to the same value configured on the server.
+curl --fail-with-body --request POST \
+  --header "Authorization: Bearer ${NUXT_WORKER_TOKEN:?Set the worker token}" \
+  "${BASE_URL:?Set the server origin}/api/ingest/remotive"
+curl --fail-with-body --request POST \
+  --header "Authorization: Bearer ${NUXT_WORKER_TOKEN:?Set the worker token}" \
+  "${BASE_URL:?Set the server origin}/api/queue/process"
+```
+
+Ingest on the provider's permitted cadence, then schedule worker calls to drain
+the queue. An ingestion response reports `queuedCount` and `queuedJobs`; check
+the JSON body as well as the HTTP status because existing adapters can return an
+`error` body with HTTP 200. Worker success returns `jobId` and `title`.
+
+Rollout: pause the eight jobs, set Production `NUXT_WORKER_TOKEN` in the Vercel
+project, deploy by pushing to `main`, edit each job to POST + header + empty
+body, verify the persisted settings, then resume. No database migration is
+required. Verify first with the isolated fixture suite, not by invoking the live
+processing endpoint; after cutover, verify from each job's execution history,
+checking the response body as well as the status (adapters can return HTTP 200
+with an `error` body). `401` means bad credentials, `503` means the server token
+is missing. Never use TEST RUN on ingestion/queue jobs: it triggers real
+production work. If a job cannot be migrated, leave it paused; do not restore
+anonymous GET execution as a rollback. To disable access, unset the server token
+and redeploy; to rotate it, pause calls, update both secret stores, then resume.
+
+Queue retries, atomic claiming and crash recovery are not implemented here.
+Keep worker invocations serial: this access-control change does not make concurrent
+workers safe or stop a poison item blocking the queue.
+
+### Regression proof
+
+`pnpm test` builds the actual Nitro server and exercises it over loopback HTTP.
+The suite starts its own disposable PostgreSQL container with synthetic
+credentials, applies the committed schema, and uses synthetic provider responses.
+It does not use `.env` database credentials or invoke deployed ingestion/worker
+endpoints. Test-only fetch interception blocks external provider access; no test
+mode or bypass is added to production handlers.
+
+Checks cover denied callers, missing server configuration, safe GET/HEAD calls
+with queued work present, authenticated ingestion → queue → persisted job, and
+anonymous public reads. The suite tears down its server processes and database
+container. Docker and a usable `postgres:16-alpine` image are required.
 
 ## Project Structure
 

@@ -1,22 +1,26 @@
 import { db } from '~~/server/database/db'
 import { jobQueues } from '~~/server/database/schema'
 import { slugify, benefitsParser } from '~~/server/utils/parsers'
-import type { RemotiveJob, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import type { HimalayasJob, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import { requireWorkerAuthorization } from '~~/server/utils/workerAuth'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireWorkerAuthorization(event)
+
   try {
-    const data = await $fetch<
-      { jobs: RemotiveJob[] }
-    >('https://remotive.com/api/remote-jobs?category=software-dev&limit=12')
+    const data = await $fetch<{ jobs: HimalayasJob[] }>('https://himalayas.app/jobs/api')
 
-    const jobsFromAPI = data.jobs.map(job => getAPIJobFromRemotiveJob(job))
+    const developerJobs = data.jobs.filter((job) => {
+      return job.categories.some(category => category.toLowerCase().includes('developer'))
+    }).slice(0, 20)
+
+    const jobsFromAPI = developerJobs.map(job => getAPIJobFromHimalaysJob(job))
     const queuedLinks: string[] = []
 
     for (const job of jobsFromAPI) {
       try {
-        // Drizzle insert with onConflictDoNothing for unique link constraint
         const result = await db.insert(jobQueues).values({
-          jobDetails: job as unknown as object, // JSONB handling
+          jobDetails: job as unknown as object,
           link: job.link,
         }).onConflictDoNothing().returning({ link: jobQueues.link })
 
@@ -30,44 +34,44 @@ export default defineEventHandler(async () => {
     }
 
     return {
-      message: `Processed ${jobsFromAPI.length} jobs from Remotive`,
+      message: `Processed ${jobsFromAPI.length} jobs from Himalayas`,
       queuedCount: queuedLinks.length,
       queuedJobs: queuedLinks,
     }
   }
   catch (e) {
-    console.error('Failed to fetch jobs from Remotive', e)
+    console.error('Failed to fetch jobs from Himalayas', e)
     return {
-      message: 'Failed to fetch jobs from Remotive',
+      message: 'Failed to fetch jobs from Himalayas',
       error: e,
     }
   }
 })
 
-const getAPIJobFromRemotiveJob = (job: RemotiveJob): JobFromAPIs => {
-  const duration = getDurationFromJobType(job.job_type)
+const getAPIJobFromHimalaysJob = (job: HimalayasJob): JobFromAPIs => {
   const experienceLevel = getExperienceLevelFromTitle(job.title)
   const role = getRoleFromTitle(job.title)
-  const tags = getTagsFromRemotiveTags(job.tags)
+  const tags = getTagsFromCategories(job.categories)
   const benefits = benefitsParser(job.description)
+  // Type definition uses unknown[], casting to string[] based on API behavior
+  const locations = getLocations(job.locationRestrictions as string[])
+
+  const duration = 'Full Time'
 
   return {
     title: job.title,
     description: job.description,
-    link: job.url,
-    salary: job.salary || 'Competitive',
-    postedAt: new Date(job.publication_date),
-    slug: slugify(`${job.title}-${job.company_name}-${job.id}`),
+    link: job.applicationLink,
+    salary: 'unknown salary',
+    postedAt: new Date(job.pubDate * 1000),
+    slug: slugify(`${job.title}-${job.companyName}-${job.pubDate}`),
     company: {
-      name: job.company_name,
-      logo: job.company_logo_url,
-      slug: slugify(job.company_name),
+      name: job.companyName,
+      logo: job.companyLogo,
+      slug: slugify(job.companyName),
       description: '',
     },
-    locations: job.candidate_required_location.split(',').map(loc => ({
-      name: loc.trim(),
-      slug: slugify(loc),
-    })),
+    locations,
     duration: {
       name: duration,
       slug: slugify(duration),
@@ -85,11 +89,6 @@ const getAPIJobFromRemotiveJob = (job: RemotiveJob): JobFromAPIs => {
   }
 }
 
-const getDurationFromJobType = (jobType: string) => {
-  if (!jobType) return 'Full Time'
-  return jobType.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
-}
-
 const getExperienceLevelFromTitle = (title: string) => {
   const t = title.toLowerCase()
   if (t.includes('senior')) return 'Senior'
@@ -97,7 +96,7 @@ const getExperienceLevelFromTitle = (title: string) => {
   if (t.includes('junior')) return 'Junior'
   if (t.includes('entry')) return 'Entry'
   if (t.includes('intern')) return 'Intern'
-  return 'Mid' // Default
+  return 'Mid'
 }
 
 const getRoleFromTitle = (title: string) => {
@@ -117,10 +116,22 @@ const getRoleFromTitle = (title: string) => {
   return 'Developer'
 }
 
-const getTagsFromRemotiveTags = (tags: string[]) => {
-  if (!tags) return []
-  return tags.map(tag => ({
-    name: tag,
-    slug: slugify(tag.replace(/#/g, 'sharp ')),
+const getTagsFromCategories = (categories: string[]) => {
+  return categories.map(category => ({
+    name: category,
+    slug: slugify(category),
   }))
+}
+
+const getLocations = (locationRestrictions: string[]) => {
+  if (locationRestrictions && locationRestrictions.length > 0) {
+    return locationRestrictions.map(location => ({
+      name: location,
+      slug: slugify(location),
+    }))
+  }
+  return [{
+    name: 'Worldwide',
+    slug: slugify('Worldwide'),
+  }]
 }

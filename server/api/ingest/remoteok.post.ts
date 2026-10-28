@@ -2,8 +2,11 @@ import { db } from '~~/server/database/db'
 import { jobQueues } from '~~/server/database/schema'
 import { slugify, benefitsParser } from '~~/server/utils/parsers'
 import type { RemoteOkJob, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import { requireWorkerAuthorization } from '~~/server/utils/workerAuth'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireWorkerAuthorization(event)
+
   try {
     const data = await $fetch<RemoteOkJob[]>('https://remoteok.com/api?api=1', {
       headers: {

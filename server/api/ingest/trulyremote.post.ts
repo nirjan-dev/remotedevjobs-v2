@@ -2,8 +2,11 @@ import { db } from '~~/server/database/db'
 import { jobQueues } from '~~/server/database/schema'
 import { slugify } from '~~/server/utils/parsers'
 import type { TrulyRemoteRecord, TrulyRemoteFields, JobFromAPIs } from '~~/server/types/JobFromAPIs'
+import { requireWorkerAuthorization } from '~~/server/utils/workerAuth'
 
-export default defineEventHandler(async () => {
+export default defineEventHandler(async (event) => {
+  requireWorkerAuthorization(event)
+
   try {
     const data = await $fetch<{ records: TrulyRemoteRecord[] }>('https://trulyremote.co/api/getListing', {
       method: 'POST',
