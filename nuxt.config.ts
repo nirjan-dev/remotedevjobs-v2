@@ -19,6 +19,12 @@ export default defineNuxtConfig({
   content: {
     experimental: { nativeSqlite: true },
   },
+
+  runtimeConfig: {
+    public: {
+      siteUrl: '',
+    },
+  },
   compatibilityDate: '2025-07-15',
   eslint: {
     config: {
